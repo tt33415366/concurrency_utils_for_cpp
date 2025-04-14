@@ -24,17 +24,21 @@ concurrency_in_cpp/
 
 ### Phase 1: Lock-free Queue
 - Read relevant chapters from "C++ Concurrency in Action" (Ch 7 on lock-free data structures)
-- Design queue interface (push, pop, empty, size)
+- Study Linux kernel coding style guidelines
+- Design queue interface (push, pop, empty, size) following Linux style
 - Implement using atomic operations and proper memory ordering
 - Handle ABA problem (likely using hazard pointers)
 - Write basic unit tests
+- Verify code style compliance
 
 ### Phase 2: Thread Pool
 - Read relevant chapters (Ch 9 on thread pools)
-- Design thread pool interface (submit, shutdown, etc.)
+- Study Linux kernel coding style for concurrency patterns
+- Design thread pool interface (submit, shutdown, etc.) following Linux style
 - Implement using lock-free queue as task queue
 - Handle worker thread management
 - Write basic unit tests
+- Verify code style compliance
 
 ### Phase 3: Testing
 - Expand test coverage for both components
@@ -53,8 +57,16 @@ concurrency_in_cpp/
 - Create usage examples
 
 ## Key Technical Considerations
+- Linux kernel coding style compliance:
+  - 80-character line limits
+  - Kernel-style braces
+  - Tab indentation (8 spaces)
+  - Naming conventions
+  - Minimal comments (self-documenting code)
+  - Error handling via return values
+
 - Memory ordering (likely acquire/release semantics)
 - Handling the ABA problem in the queue
-- Proper shutdown sequence for thread pool
+- Proper shutdown sequence for thread pool  
 - Exception safety
 - Minimizing cache contention

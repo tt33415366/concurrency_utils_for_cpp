@@ -1,7 +1,7 @@
 #ifndef LOCKFREE_QUEUE_IPP
 #define LOCKFREE_QUEUE_IPP
 
-namespace lockfree {
+namespace lfq {
 
 template <typename T>
 Queue<T>::Queue() : head_(new Node(T())), tail_(head_.load()), size_(0) {}
@@ -62,6 +62,6 @@ size_t Queue<T>::size() const {
     return size_.load(std::memory_order_acquire);
 }
 
-} // namespace lockfree
+} // namespace lfq
 
 #endif // LOCKFREE_QUEUE_IPP

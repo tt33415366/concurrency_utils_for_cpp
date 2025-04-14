@@ -1,10 +1,11 @@
-#ifndef LOCKFREE_QUEUE_HPP
-#define LOCKFREE_QUEUE_HPP
+#ifndef LOCKFREE_QUEUE_H
+#define LOCKFREE_QUEUE_H
 
 #include <atomic>
 #include <memory>
 
-namespace lockfree {
+/* Linux-style namespace */
+namespace lfq {
 
 template <typename T>
 class Queue {
@@ -34,8 +35,8 @@ private:
     std::atomic<size_t> size_;
 };
 
-} // namespace lockfree
+} // namespace lfq
 
 #include "queue.ipp"
 
-#endif // LOCKFREE_QUEUE_HPP
+#endif /* LOCKFREE_QUEUE_H */
