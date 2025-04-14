@@ -1,0 +1,22 @@
+# Build directories
+build/
+bin/
+*.o
+*.a
+*.so
+
+# IDE files
+.vscode/
+*.code-workspace
+
+# Compiled files
+*.out
+*.exe
+
+# Dependency directories
+deps/
+_deps/
+
+# Temp files
+*.tmp
+*.swp
