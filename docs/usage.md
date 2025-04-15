@@ -1,11 +1,11 @@
 # Usage Examples (Linux Kernel Style)
 
-/*
- * Kernel-style usage examples
- * - 80-character line limits
- * - Explicit error checking
- * - Minimal comments
- */
+
+Kernel-style usage examples
+- 80-character line limits
+- Explicit error checking
+- Minimal comments
+
 
 ## Lock-free Queue
 ```cpp

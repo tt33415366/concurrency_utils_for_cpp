@@ -1,12 +1,24 @@
-# Design Documentation
+# Design Documentation (Linux Kernel Style)
 
-## Lock-free Queue Implementation
+
+Kernel-style documentation format
+- 80-character line limits
+- Minimal comments (self-documenting code)
+- Error handling via return values
+
+
+## Lock-free Queue Implementation (Linux Style)
 
 ### Key Design Decisions
-1. **Memory Model**: Uses acquire/release semantics for thread synchronization
-2. **ABA Prevention**: Uses atomic counters to avoid ABA problem
-3. **Node Management**: Uses separate head/tail pointers with dummy node
-4. **Size Tracking**: Atomic size counter for O(1) size() operation
+1. Memory model: acquire/release semantics
+2. ABA prevention: atomic counters
+3. Node management: head/tail pointers
+4. Size tracking: atomic counter (O(1))
+5. Style compliance:
+   - 80-char line limits
+   - Kernel brace style
+   - 8-space tabs
+   - Minimal comments
 
 ### Interface
 ```cpp
@@ -20,13 +32,18 @@ public:
 };
 ```
 
-## Thread Pool Implementation
+## Thread Pool Implementation (Linux Style)
 
 ### Key Design Decisions
-1. **Task Queue**: Uses our lock-free queue for task storage
-2. **Worker Management**: Fixed number of worker threads
-3. **Shutdown**: Graceful shutdown with task draining
-4. **Exception Safety**: Worker threads handle task exceptions
+1. Task queue: lock-free queue storage
+2. Worker threads: fixed pool size  
+3. Shutdown: graceful with drain
+4. Exception safety: worker handles
+5. Style compliance:
+   - 80-char line limits
+   - Kernel brace style
+   - 8-space tabs
+   - Return code errors
 
 ### Interface
 ```cpp

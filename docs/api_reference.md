@@ -1,19 +1,26 @@
-# API Reference
+# API Reference (Linux Kernel Style)
 
-## Lockfree Queue
+## Lockfree Queue Implementation
 
 ### `template<typename T> class Queue`
-Thread-safe lock-free queue implementation.
+Thread-safe lock-free queue following Linux kernel coding standards.
 
-#### Public Members
+Key Style Features:
+- 80-character line limits
+- Kernel-style brace formatting  
+- 8-space tab indentation
+- Minimal comments (self-documenting)
+- Error handling via return values
+
+#### Public Interface
 | Method | Description |
 |--------|-------------|
-| `Queue()` | Constructs an empty queue |
-| `~Queue()` | Destructor |
-| `void push(T value)` | Pushes value to queue |
-| `bool pop(T& value)` | Pops value from queue |
-| `bool empty() const` | Checks if queue is empty |
-| `size_t size() const` | Returns number of elements |
+| `Queue()` | Construct empty queue |
+| `~Queue()` | Cleanup resources |
+| `push(T val)` | Add to queue (returns void) |
+| `pop(T& val)` | Remove from queue (returns bool) |
+| `empty()` | Check if empty |
+| `size()` | Get element count |
 
 ## Thread Pool
 
