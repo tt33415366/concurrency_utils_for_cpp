@@ -1,72 +1,66 @@
-# Lock-free Queue and Thread Pool Project Plan
+# Lock-Free Queue and Thread Pool Project Plan
 
-## Project Structure
-```
-concurrency_in_cpp/
-├── include/               # Public headers
-│   └── lockfree/          # Library headers
-│       ├── queue.hpp      # Lock-free queue interface
-│       └── thread_pool.hpp # Thread pool interface
-├── src/                   # Implementation
-│   ├── queue.cpp          # Lock-free queue implementation
-│   └── thread_pool.cpp    # Thread pool implementation
-├── tests/                 # Unit tests
-│   ├── test_queue.cpp     # Queue tests
-│   └── test_thread_pool.cpp # Thread pool tests
-├── benchmarks/            # Performance tests
-│   ├── queue_bench.cpp    # Queue benchmarks
-│   └── thread_pool_bench.cpp # Thread pool benchmarks
-└── docs/                  # Documentation
-    └── design.md          # Design decisions
-```
+## Project Overview
+Implement a C++11 library featuring:
+1. A lock-free queue using atomic operations
+2. A thread pool built on the lock-free queue
+3. Comprehensive tests and benchmarks
+4. Complete documentation
+
+## Technical Approach
+- **Lock-free queue**: Implement using compare-and-swap (CAS) operations
+- **Thread pool**: Work-stealing design with queue-based task distribution
+- **Testing**: Google Test framework with concurrency tests
+- **Benchmarking**: Google Benchmark for performance metrics
+- **Documentation**: Doxygen with kernel-doc style comments
+- **Code style**: Linux kernel coding style (80 char lines, kernel-doc)
 
 ## Implementation Phases
 
-### Phase 1: Lock-free Queue
-- Read relevant chapters from "C++ Concurrency in Action" (Ch 7 on lock-free data structures)
-- Study Linux kernel coding style guidelines
-- Design queue interface (push, pop, empty, size) following Linux style
-- Implement using atomic operations and proper memory ordering
-- Handle ABA problem (likely using hazard pointers)
-- Write basic unit tests
-- Verify code style compliance
+### Phase 1: Lock-Free Queue (2 weeks)
+- Design atomic operations interface
+- Implement core queue functionality
+- Basic unit tests
+- Initial documentation
 
-### Phase 2: Thread Pool
-- Read relevant chapters (Ch 9 on thread pools)
-- Study Linux kernel coding style for concurrency patterns
-- Design thread pool interface (submit, shutdown, etc.) following Linux style
-- Implement using lock-free queue as task queue
-- Handle worker thread management
-- Write basic unit tests
-- Verify code style compliance
+### Phase 2: Thread Pool (1 week)
+- Design worker thread management
+- Implement task scheduling
+- Integration with queue
+- Basic functionality tests
 
-### Phase 3: Testing
-- Expand test coverage for both components
-- Test edge cases and thread safety
-- Add stress tests for concurrent usage
+### Phase 3: Testing (1 week parallel)
+- Comprehensive unit tests
+- Concurrency stress tests
+- Valgrind memory checks
+- Test coverage analysis
 
-### Phase 4: Benchmarking
-- Design benchmarks for queue operations
-- Measure throughput under contention
-- Benchmark thread pool task processing
-- Compare against standard implementations
+### Phase 4: Benchmarking (1 week)
+- Throughput measurements
+- Latency profiling
+- Comparison with alternatives
+- Performance optimization
 
-### Phase 5: Documentation
-- Write API documentation
-- Document design decisions
-- Create usage examples
+## Documentation
+- API reference (Doxygen)
+- Usage examples
+- Design rationale
+- Performance characteristics
 
-## Key Technical Considerations
-- Linux kernel coding style compliance:
-  - 80-character line limits
-  - Kernel-style braces
-  - Tab indentation (8 spaces)
-  - Naming conventions
-  - Minimal comments (self-documenting code)
-  - Error handling via return values
+## Code Style
+- Follow Linux kernel style guidelines
+- 80 character line limits
+- Kernel-doc comment format
+- Clang-format enforcement
 
-- Memory ordering (likely acquire/release semantics)
-- Handling the ABA problem in the queue
-- Proper shutdown sequence for thread pool  
-- Exception safety
-- Minimizing cache contention
+## Milestones
+1. Lock-free queue complete - Week 2
+2. Thread pool functional - Week 3
+3. Tests passing - Week 4
+4. Benchmarks complete - Week 5
+5. Documentation finalized - Week 6
+
+## Risk Management
+- Concurrency bugs: Addressed through extensive testing
+- Performance issues: Identified and optimized via benchmarks
+- Memory model complexity: Documented thoroughly
