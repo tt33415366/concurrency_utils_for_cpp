@@ -18,8 +18,20 @@ ThreadPool::~ThreadPool() {
 
 
 void ThreadPool::wait() {
-    while (!task_queue_.empty()) {
-        std::this_thread::yield();
+    while (true) {
+        // Full memory barrier to ensure we see all updates
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        
+        // Check both queue and active tasks with strong ordering
+        bool queue_empty = task_queue_.empty();
+        int active = active_tasks_.load(std::memory_order_seq_cst);
+        
+        if (queue_empty && active == 0) {
+            break;
+        }
+        
+        // Brief sleep to prevent busy waiting
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
     }
 }
 
@@ -29,23 +41,36 @@ void ThreadPool::shutdown() {
         return; // Already shutdown
     }
 
-    // Wake up all threads with proper synchronization
-    std::atomic<size_t> count{workers_.size()};
+    // First wait for active tasks to complete
+    wait();
+
+    // Wake up all threads with poison pills
     for (size_t i = 0; i < workers_.size(); ++i) {
-        task_queue_.push([&count]{
-            count.fetch_sub(1, std::memory_order_release);
-        });
+        try {
+            task_queue_.push(nullptr); // Poison pill
+        } catch (...) {
+            // Ignore queue errors during shutdown
+        }
     }
 
-    // Wait for all workers to finish
-    while (count.load(std::memory_order_acquire) > 0) {
-        std::this_thread::yield();
-    }
-
-    // Join all threads
+    // Join all threads with timeout
     for (auto& worker : workers_) {
         if (worker.joinable()) {
-            worker.join();
+            try {
+                worker.join();
+            } catch (...) {
+                worker.detach(); // Force detach if join fails
+            }
+        }
+    }
+
+    // Final cleanup of any remaining tasks
+    Task task;
+    while (task_queue_.pop(task)) {
+        if (task) {
+            try {
+                task();
+            } catch (...) {}
         }
     }
 }
@@ -54,23 +79,30 @@ void ThreadPool::worker_loop() {
     while (running_.load(std::memory_order_acquire)) {
         Task task;
         if (task_queue_.pop(task)) {
+            if (!task) { // Poison pill received
+                break;
+            }
+            
             try {
                 task();
             } catch (...) {
                 // Swallow exceptions to prevent thread termination
             }
         } else {
-            std::this_thread::yield();
+            // Reduce contention when queue is empty
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
         }
     }
 
     // Drain remaining tasks after shutdown
     Task task;
     while (task_queue_.pop(task)) {
-        try {
-            task();
-        } catch (...) {
-            // Swallow exceptions
+        if (task) { // Skip poison pills
+            try {
+                task();
+            } catch (...) {
+                // Swallow exceptions
+            }
         }
     }
 }

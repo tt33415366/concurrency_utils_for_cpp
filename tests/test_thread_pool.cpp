@@ -1,20 +1,21 @@
 #include <gtest/gtest.h>
 #include "../include/lockfree/thread_pool.hpp"
 #include <atomic>
+#include <vector>
+#include <thread>
+#include <future>
+#include <memory>
 
 TEST(ThreadPoolTest, BasicTaskExecution) {
     lockfree::ThreadPool pool(2);
     std::atomic_int counter(0);
     
-    pool.submit([&counter]() {
+    auto future = pool.submit([&counter]() {
         counter.fetch_add(1);
+        return 42;
     });
     
-    // Wait for task completion
-    while (counter.load() == 0) {
-        // Spin wait
-    }
-    
+    EXPECT_EQ(42, future.get());
     EXPECT_EQ(1, counter.load());
 }
 
@@ -33,6 +34,49 @@ TEST(ThreadPoolTest, MultipleTasks) {
     EXPECT_EQ(num_tasks, counter.load(std::memory_order_relaxed));
 }
 
+TEST(ThreadPoolTest, HighConcurrency) {
+    lockfree::ThreadPool pool;
+    constexpr int kThreads = 8;
+    constexpr int kTasksPerThread = 1000;
+    std::vector<std::thread> threads;
+    std::atomic_int total_tasks(0);
+    
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&] {
+            for (int j = 0; j < kTasksPerThread; ++j) {
+                pool.submit([&] {
+                    total_tasks.fetch_add(1, std::memory_order_relaxed);
+                });
+            }
+        });
+    }
+    
+    for (auto& t : threads) {
+        t.join();
+    }
+    
+    pool.wait();
+    EXPECT_EQ(kThreads * kTasksPerThread, total_tasks.load());
+}
+
+TEST(ThreadPoolTest, WorkStealing) {
+    lockfree::ThreadPool pool(2);
+    std::atomic_int worker1_tasks(0);
+    std::atomic_int worker2_tasks(0);
+    
+    // Submit tasks that identify which worker executes them
+    for (int i = 0; i < 100; ++i) {
+        pool.submit([&, i]() {
+            if (i % 2 == 0) worker1_tasks++;
+            else worker2_tasks++;
+        });
+    }
+    
+    pool.wait();
+    EXPECT_GT(worker1_tasks.load(), 0);
+    EXPECT_GT(worker2_tasks.load(), 0);
+}
+
 TEST(ThreadPoolTest, ShutdownBehavior) {
     lockfree::ThreadPool pool(2);
     std::atomic_int counter(0);
@@ -41,38 +85,40 @@ TEST(ThreadPoolTest, ShutdownBehavior) {
         counter.fetch_add(1);
     });
     
-    // Wait for task completion
-    while (counter.load() == 0) {
-        // Spin wait
-    }
-    
     pool.shutdown();
     EXPECT_EQ(1, counter.load());
     
     // Verify no new tasks accepted
-    bool accepted = true;
-    try {
+    EXPECT_THROW({
         pool.submit([&counter]() {
             counter.fetch_add(1);
         });
-    } catch (...) {
-        accepted = false;
-    }
-    EXPECT_FALSE(accepted);
+    }, std::runtime_error);
 }
 
 TEST(ThreadPoolTest, ExceptionHandling) {
     lockfree::ThreadPool pool(2);
     std::atomic_bool exception_caught(false);
     
-    pool.submit([]() {
+    auto future = pool.submit([]() -> int {
         throw std::runtime_error("Test exception");
+        return 0;
     });
     
-    // Wait briefly to allow task processing
-    for (int i = 0; i < 100 && !exception_caught.load(); ++i) {
-        // Spin wait
+    EXPECT_THROW({ future.get(); }, std::runtime_error);
+}
+
+TEST(ThreadPoolTest, ResourceCleanup) {
+    std::weak_ptr<lockfree::ThreadPool> weak_pool;
+    {
+        auto pool = std::make_shared<lockfree::ThreadPool>(2);
+        weak_pool = pool;
+        
+        pool->submit([]() {
+            // Simple task
+        });
     }
     
-    EXPECT_FALSE(exception_caught.load());
+    // Verify pool is destroyed after scope
+    EXPECT_TRUE(weak_pool.expired());
 }

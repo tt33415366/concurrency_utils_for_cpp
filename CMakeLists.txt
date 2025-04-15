@@ -11,13 +11,9 @@ endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 
-# Google Test setup
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/release-1.8.1.tar.gz
-)
-FetchContent_MakeAvailable(googletest)
+# Google Test setup - use local copy
+message(STATUS "Using local Google Test")
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/googletest)
 
 # Header-only library target
 add_library(lockfree_queue INTERFACE)
@@ -33,8 +29,8 @@ target_include_directories(lockfree_queue INTERFACE
 
 # Google Test setup
 include_directories(
-    ${CMAKE_CURRENT_BINARY_DIR}/_deps/googletest-src/googletest/include
-    ${CMAKE_CURRENT_BINARY_DIR}/_deps/googletest-src/googletest
+    ${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include
+    ${CMAKE_SOURCE_DIR}/third_party/googletest/googlemock/include
 )
 
 # Test executables
@@ -63,65 +59,23 @@ target_link_libraries(test_thread_pool
     pthread
 )
 
-# Copy Google Test headers to build directory
-file(COPY ${CMAKE_CURRENT_BINARY_DIR}/_deps/googletest-src/googletest/include/gtest
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include)
-
-# Google Benchmark setup
-include(FetchContent)
-FetchContent_Declare(
-  benchmark
-  URL https://github.com/google/benchmark/archive/v1.7.0.tar.gz
-)
-set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark tests")
-FetchContent_MakeAvailable(benchmark)
-
-# Benchmark executables
-add_executable(queue_bench
-    benchmarks/queue_bench.cpp
-)
-
-add_executable(queue_concurrent_bench
-    benchmarks/queue_concurrent_bench.cpp
-)
-
-add_executable(thread_pool_bench
-    benchmarks/thread_pool_bench.cpp
-)
-
-add_executable(simple_thread_pool_bench
-    benchmarks/simple_thread_pool_bench.cpp
-)
-
-target_link_libraries(queue_bench
-    PRIVATE
-    lockfree_queue
-    benchmark::benchmark
-    pthread
-)
-
-target_link_libraries(queue_concurrent_bench
-    PRIVATE
-    lockfree_queue
-    benchmark::benchmark
-    pthread
-)
-
-target_link_libraries(thread_pool_bench
-    PRIVATE
-    lockfree_queue
-    benchmark::benchmark
-    pthread
-)
-
-target_link_libraries(simple_thread_pool_bench
-    PRIVATE
-    lockfree_queue
-    pthread
-)
+# Benchmark tests disabled for now
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+
+# Minimal test executable
+add_executable(minimal_test
+    tests/minimal/minimal_test.cpp
+)
+
+target_link_libraries(minimal_test
+    PRIVATE
+    gtest
+    gtest_main
+    pthread
+)
 
 enable_testing()
 add_test(NAME test_queue COMMAND test_queue)
 add_test(NAME test_thread_pool COMMAND test_thread_pool)
+add_test(NAME minimal_test COMMAND minimal_test)

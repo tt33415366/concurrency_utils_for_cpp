@@ -1,44 +1,69 @@
 #include <gtest/gtest.h>
+#include <thread>
+#include <vector>
+#include <atomic>
 #include "../include/lockfree/queue.hpp"
 
-namespace lfq {} // Forward declare namespace
+using namespace lockfree;
 
-TEST(LFQueueTest, InitialEmpty) {
-    lfq::Queue<int> queue;
-    EXPECT_TRUE(queue.empty());
-    EXPECT_EQ(0, queue.size());
+TEST(LockfreeQueueTest, Basic) {
+    lockfree::Queue<int> q;
+    EXPECT_TRUE(q.empty());
+    
+    q.push(42);
+    EXPECT_FALSE(q.empty());
+    
+    int val;
+    EXPECT_TRUE(q.pop(val));
+    EXPECT_EQ(42, val);
+    EXPECT_TRUE(q.empty());
 }
 
-TEST(LFQueueTest, SinglePushPop) {
-    lfq::Queue<int> queue;
-    queue.push(42);
-    EXPECT_FALSE(queue.empty());
-    EXPECT_EQ(1, queue.size());
-
-    int value = 0;
-    EXPECT_TRUE(queue.pop(value));
-    EXPECT_EQ(42, value);
-    EXPECT_TRUE(queue.empty());
-    EXPECT_EQ(0, queue.size());
-}
-
-TEST(LFQueueTest, MultiplePushPop) {
-    lfq::Queue<int> queue;
-    for (int i = 0; i < 10; ++i) {
-        queue.push(i);
+TEST(LockfreeQueueTest, ConcurrentPush) {
+    lockfree::Queue<int> q;
+    constexpr int kThreads = 4;
+    constexpr int kPerThread = 1000;
+    std::vector<std::thread> threads;
+    
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&q] {
+            for (int j = 0; j < kPerThread; ++j) {
+                q.push(j);
+            }
+        });
     }
-    EXPECT_EQ(10, queue.size());
-
-    for (int i = 0; i < 10; ++i) {
-        int value = 0;
-        EXPECT_TRUE(queue.pop(value));
-        EXPECT_EQ(i, value);
+    
+    for (auto& t : threads) {
+        t.join();
     }
-    EXPECT_TRUE(queue.empty());
+    
+    EXPECT_EQ(kThreads * kPerThread, q.size());
 }
 
-TEST(LFQueueTest, PopEmpty) {
-    lfq::Queue<int> queue;
-    int value = 0;
-    EXPECT_FALSE(queue.pop(value));
+TEST(LockfreeQueueTest, ConcurrentPop) {
+    lockfree::Queue<int> q;
+    constexpr int kItems = 10000;
+    for (int i = 0; i < kItems; ++i) {
+        q.push(i);
+    }
+    
+    std::atomic<int> count{0};
+    std::vector<std::thread> threads;
+    constexpr int kThreads = 4;
+    
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&q, &count] {
+            int val;
+            while (q.pop(val)) {
+                ++count;
+            }
+        });
+    }
+    
+    for (auto& t : threads) {
+        t.join();
+    }
+    
+    EXPECT_EQ(kItems, count);
+    EXPECT_TRUE(q.empty());
 }

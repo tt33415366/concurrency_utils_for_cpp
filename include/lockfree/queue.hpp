@@ -3,9 +3,10 @@
 
 #include <atomic>
 #include <memory>
+#include <vector>
+#include <mutex>
 
-/* Linux-style namespace */
-namespace lfq {
+namespace lockfree {
 
 template <typename T>
 class Queue {
@@ -30,12 +31,25 @@ private:
         Node(T value) : data(std::move(value)), next(nullptr) {}
     };
 
+    // Hazard pointer record
+    struct HazardPointer {
+        std::atomic<Node*> ptr;
+        HazardPointer* next;
+    };
+
+    static thread_local HazardPointer hp_;
+
     std::atomic<Node*> head_;
     std::atomic<Node*> tail_;
     std::atomic<size_t> size_;
+    std::vector<Node*> retired_nodes_;
+    std::mutex retired_mutex_;
+
+    void retire_node(Node* node);
+    void scan();
 };
 
-} // namespace lfq
+} // namespace lockfree
 
 #include "queue.ipp"
 
