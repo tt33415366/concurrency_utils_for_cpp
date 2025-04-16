@@ -67,9 +67,12 @@ bool Queue<T>::pop(T& value) {
 template <typename T>
 void Queue<T>::retire_node(Node* node) {
     // Add to lock-free retired list
-    node->next.store(retired_list_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    Node* expected = retired_list_.load(std::memory_order_relaxed);
+    node->next.store(expected, std::memory_order_relaxed);
     while (!retired_list_.compare_exchange_weak(
-        node->next, node, std::memory_order_release, std::memory_order_relaxed)) {}
+        expected, node, std::memory_order_release, std::memory_order_relaxed)) {
+        node->next.store(expected, std::memory_order_relaxed);
+    }
     
     // Scan periodically
     static thread_local int count = 0;
@@ -78,6 +81,7 @@ void Queue<T>::retire_node(Node* node) {
     }
 }
 
+template <typename T>
 void Queue<T>::scan(HazardPointer* hp_head) {
     // Collect all hazard pointers
     std::vector<Node*> hazards;
@@ -119,11 +123,21 @@ void Queue<T>::scan(HazardPointer* hp_head) {
 
 template <typename T>
 Queue<T>::~Queue() {
-    for (auto node : retired_nodes_) {
-        delete node;
+    // Delete all nodes from retired list
+    Node* retired = retired_list_.exchange(nullptr);
+    while (retired) {
+        Node* next = retired->next.load(std::memory_order_relaxed);
+        delete retired;
+        retired = next;
     }
-    head_.store(nullptr);
-    tail_.store(nullptr);
+    
+    // Delete remaining nodes in queue
+    Node* current = head_.load();
+    while (current) {
+        Node* next = current->next.load(std::memory_order_relaxed);
+        delete current;
+        current = next;
+    }
 }
 
 template <typename T>

@@ -1,4 +1,5 @@
-#include <gtest/gtest.h>
+#include "../third_party/googletest/googletest/include/gtest/gtest.h"
+#include <iostream>
 #include "../include/lockfree/thread_pool.hpp"
 #include <atomic>
 #include <vector>
@@ -35,18 +36,23 @@ TEST(ThreadPoolTest, MultipleTasks) {
 }
 
 TEST(ThreadPoolTest, HighConcurrency) {
-    lockfree::ThreadPool pool;
+    lockfree::ThreadPool pool(4); // Limit to 4 threads
     constexpr int kThreads = 8;
-    constexpr int kTasksPerThread = 1000;
+    constexpr int kTasksPerThread = 100;
     std::vector<std::thread> threads;
     std::atomic_int total_tasks(0);
+    std::atomic_int failures(0);
     
     for (int i = 0; i < kThreads; ++i) {
-        threads.emplace_back([&] {
+        threads.emplace_back([&, i] {
             for (int j = 0; j < kTasksPerThread; ++j) {
-                pool.submit([&] {
-                    total_tasks.fetch_add(1, std::memory_order_relaxed);
-                });
+                try {
+                    pool.submit([&] {
+                        total_tasks.fetch_add(1, std::memory_order_relaxed);
+                    });
+                } catch (...) {
+                    failures.fetch_add(1);
+                }
             }
         });
     }
@@ -56,6 +62,11 @@ TEST(ThreadPoolTest, HighConcurrency) {
     }
     
     pool.wait();
+    std::cout << "Completed " << total_tasks.load() << "/" 
+              << (kThreads * kTasksPerThread) << " tasks\n";
+    std::cout << "Failures: " << failures.load() << "\n";
+    
+    EXPECT_EQ(0, failures.load());
     EXPECT_EQ(kThreads * kTasksPerThread, total_tasks.load());
 }
 

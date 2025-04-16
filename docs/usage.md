@@ -28,7 +28,23 @@ if (queue.pop_bulk(results, 3)) {  // Atomic multi-remove
 }
 ```
 
-## Thread Pool
+## Thread Pool Configuration
+
+Recommended settings based on workload:
+
+```cpp
+// CPU-bound tasks
+lockfree::ThreadPool cpu_pool(std::thread::hardware_concurrency());
+
+// IO-bound tasks  
+lockfree::ThreadPool io_pool(std::thread::hardware_concurrency() * 2);
+
+// Mixed workload
+lockfree::ThreadPool mixed_pool(
+    std::thread::hardware_concurrency() * 1.5
+);
+
+## Thread Pool Usage
 ```cpp
 lockfree::ThreadPool pool;  // Defaults to hardware_concurrency
 

@@ -76,8 +76,10 @@ void ThreadPool::shutdown() {
 }
 
 void ThreadPool::worker_loop() {
-    while (running_.load(std::memory_order_acquire)) {
+    while (true) {
         Task task;
+        
+        // Try to get a task with timeout
         if (task_queue_.pop(task)) {
             if (!task) { // Poison pill received
                 break;
@@ -88,20 +90,27 @@ void ThreadPool::worker_loop() {
             } catch (...) {
                 // Swallow exceptions to prevent thread termination
             }
-        } else {
+        } 
+        else if (!running_.load(std::memory_order_acquire)) {
+            // Exit if queue is empty and shutdown was requested
+            break;
+        }
+        else {
             // Reduce contention when queue is empty
             std::this_thread::sleep_for(std::chrono::microseconds(100));
         }
     }
 
     // Drain remaining tasks after shutdown
-    Task task;
-    while (task_queue_.pop(task)) {
-        if (task) { // Skip poison pills
-            try {
-                task();
-            } catch (...) {
-                // Swallow exceptions
+    if (running_.load(std::memory_order_acquire)) {
+        Task task;
+        while (task_queue_.pop(task)) {
+            if (task) { // Skip poison pills
+                try {
+                    task();
+                } catch (...) {
+                    // Swallow exceptions
+                }
             }
         }
     }

@@ -36,6 +36,11 @@ Key Style Features:
 
 #### Key Features
 
+## Lockfree Thread Pool
+
+### `class ThreadPool`
+Thread-safe pool with work stealing following Linux kernel coding standards.
+
 ### Queue Features:
 - Lock-free multi-producer/multi-consumer
 - Bulk operations (3-5x throughput)

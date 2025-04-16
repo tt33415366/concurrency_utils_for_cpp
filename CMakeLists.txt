@@ -11,9 +11,21 @@ endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 
-# Google Test setup - use local copy
-message(STATUS "Using local Google Test")
-add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/googletest)
+# Benchmark setup - temporarily disabled due to network issues
+option(ENABLE_BENCHMARKS "Build benchmark tests" OFF)
+
+# Google Test setup
+if(NOT TARGET gtest)
+    message(STATUS "Using local Google Test from third_party")
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/googletest)
+endif()
+
+# Set up include directories
+include_directories(
+    SYSTEM ${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include
+    SYSTEM ${CMAKE_SOURCE_DIR}/third_party/googletest/googlemock/include
+    ${CMAKE_SOURCE_DIR}/include
+)
 
 # Header-only library target
 add_library(lockfree_queue INTERFACE)
@@ -59,7 +71,6 @@ target_link_libraries(test_thread_pool
     pthread
 )
 
-# Benchmark tests disabled for now
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
