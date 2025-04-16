@@ -61,15 +61,30 @@ try {
 ```
 
 ## Best Practices (Linux Style)
-1. Check empty() before pop() - avoids waits
-2. Use futures for task results
-3. Call shutdown() before destroy
-4. Reuse pool instances
-5. Size queue for workload
-6. Style compliance:
+
+### Queue Usage
+1. Prefer bulk operations for better throughput
+2. Size queue appropriately for workload
+3. Check empty() before pop() to avoid waits
+4. Reuse queue instances to avoid allocation
+
+### Thread Pool Usage  
+1. Monitor active_tasks()/pending_tasks() for load
+2. Use wait_for() with timeout for responsiveness
+3. Reuse pool instances to avoid thread creation
+4. Handle task exceptions via futures
+5. Size pool based on workload characteristics
+
+### General
+1. Follow Linux kernel style:
    - 80-char line limits
    - Explicit error checks
-   - Kernel-style returns
+   - Return code conventions
+2. Profile before optimizing
+3. Test edge cases:
+   - Empty/full queue
+   - Pool shutdown
+   - Exception paths
 
 ## Error Handling (Linux Style)
 - Queue pop(): returns false if empty
