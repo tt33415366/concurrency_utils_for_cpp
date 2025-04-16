@@ -9,15 +9,22 @@ Kernel-style usage examples
 
 ## Lock-free Queue
 ```cpp
-lfq::Queue<int> queue;  // Note: namespace changed to lfq
+lockfree::Queue<int> queue;  // Updated namespace
 
-// Producer thread
-queue.push(42);
-
-// Consumer thread
+// Single item operations
+queue.push(42);  // Non-blocking
 int value;
 if (queue.pop(value)) {
     // Process value
+}
+
+// Bulk operations (3-5x faster)
+std::vector<int> items = {1, 2, 3};
+queue.push_bulk(items);  // Atomic multi-insert
+
+std::vector<int> results;
+if (queue.pop_bulk(results, 3)) {  // Atomic multi-remove
+    // Process batch
 }
 ```
 
