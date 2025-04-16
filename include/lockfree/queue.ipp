@@ -66,28 +66,55 @@ bool Queue<T>::pop(T& value) {
 
 template <typename T>
 void Queue<T>::retire_node(Node* node) {
-    if (!node) return;
+    // Add to lock-free retired list
+    node->next.store(retired_list_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    while (!retired_list_.compare_exchange_weak(
+        node->next, node, std::memory_order_release, std::memory_order_relaxed)) {}
     
-    std::lock_guard<std::mutex> lock(retired_mutex_);
-    retired_nodes_.push_back(node);
-    if (retired_nodes_.size() >= 100) {
-        scan();
+    // Scan periodically
+    static thread_local int count = 0;
+    if (++count % 100 == 0) {
+        scan(&hp_);
     }
 }
 
-template <typename T>
-void Queue<T>::scan() {
-    std::vector<Node*> survivors;
-    Node* protected_ptr = hp_.ptr.load(std::memory_order_acquire);
-    
-    for (auto node : retired_nodes_) {
-        if (node == protected_ptr) {
-            survivors.push_back(node);
-        } else {
-            delete node;
+void Queue<T>::scan(HazardPointer* hp_head) {
+    // Collect all hazard pointers
+    std::vector<Node*> hazards;
+    for (HazardPointer* hp = hp_head; hp; hp = hp->next) {
+        if (Node* ptr = hp->ptr.load(std::memory_order_acquire)) {
+            hazards.push_back(ptr);
         }
     }
-    retired_nodes_ = std::move(survivors);
+    
+    // Process retired nodes
+    Node* retired = retired_list_.exchange(nullptr, std::memory_order_acquire);
+    std::vector<Node*> survivors;
+    
+    while (retired) {
+        Node* next = retired->next.load(std::memory_order_relaxed);
+        bool hazardous = false;
+        
+        for (Node* hazard : hazards) {
+            if (retired == hazard) {
+                hazardous = true;
+                break;
+            }
+        }
+        
+        if (hazardous) {
+            survivors.push_back(retired);
+        } else {
+            delete retired;
+        }
+        
+        retired = next;
+    }
+    
+    // Re-add surviving nodes
+    for (Node* node : survivors) {
+        retire_node(node);
+    }
 }
 
 template <typename T>

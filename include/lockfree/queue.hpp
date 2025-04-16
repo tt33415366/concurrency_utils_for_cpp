@@ -42,11 +42,10 @@ private:
     std::atomic<Node*> head_;
     std::atomic<Node*> tail_;
     std::atomic<size_t> size_;
-    std::vector<Node*> retired_nodes_;
-    std::mutex retired_mutex_;
-
+    std::atomic<Node*> retired_list_{nullptr};
+    
     void retire_node(Node* node);
-    void scan();
+    void scan(HazardPointer* hp_head);
 };
 
 } // namespace lockfree
