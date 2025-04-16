@@ -87,10 +87,28 @@ try {
    - Exception paths
 
 ## Error Handling (Linux Style)
-- Queue pop(): returns false if empty
-- Thread pool submit(): returns error if shutdown
-- Tasks: exceptions in futures
-- Style notes:
-  - Prefer return codes over exceptions
-  - Document all error cases
-  - Check all returns
+
+### Queue Operations
+- pop(): returns false if empty (no exceptions)
+- push_bulk(): returns false if allocation fails
+- pop_bulk(): returns false if empty
+- Style: Consistent return code pattern
+
+### Thread Pool
+- submit(): throws runtime_error if shutdown
+- wait_for(): returns false on timeout
+- Tasks: Exceptions captured in futures
+- Shutdown: No new tasks accepted
+
+### General Principles
+1. Document all error conditions
+2. Check all return values
+3. Prefer return codes over exceptions where possible
+4. Test error paths:
+   - Queue full/empty conditions
+   - Pool shutdown scenarios
+   - Allocation failures
+5. Style compliance:
+   - 80-char line limits
+   - Explicit error checks
+   - Kernel-style returns
