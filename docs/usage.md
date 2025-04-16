@@ -30,18 +30,34 @@ if (queue.pop_bulk(results, 3)) {  // Atomic multi-remove
 
 ## Thread Pool
 ```cpp
-lfq::ThreadPool pool(4);  // Note: namespace changed to lfq
+lockfree::ThreadPool pool;  // Defaults to hardware_concurrency
 
-// Submit tasks
-auto future = pool.submit([]{
-    return some_computation();
-});
+// Submit with backpressure
+for (int i = 0; i < 1000; ++i) {
+    auto future = pool.submit([i] {
+        return process_item(i); 
+    });
+    futures.push_back(std::move(future));
+}
 
-// Get result
-auto result = future.get();
+// Monitor progress
+std::cout << "Active: " << pool.active_tasks() 
+          << " Pending: " << pool.pending_tasks() << "\n";
 
-// Shutdown when done
-pool.shutdown();
+// Wait with timeout
+if (pool.wait_for(std::chrono::seconds(5))) {
+    std::cout << "All tasks completed\n";
+} else {
+    std::cout << "Timeout reached\n";
+    pool.shutdown();  // Force shutdown
+}
+
+// Exception handling
+try {
+    auto result = futures[0].get();
+} catch (const std::exception& e) {
+    std::cerr << "Task failed: " << e.what() << "\n";
+}
 ```
 
 ## Best Practices (Linux Style)
