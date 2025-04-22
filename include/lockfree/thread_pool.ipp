@@ -1,12 +1,17 @@
 #ifndef LOCKFREE_THREAD_POOL_IPP
 #define LOCKFREE_THREAD_POOL_IPP
 
+#include <chrono>
+#include <iostream>
+#include <random>
+
 namespace lockfree {
 
 ThreadPool::ThreadPool(size_t num_threads) {
     workers_.reserve(num_threads);
     for (size_t i = 0; i < num_threads; ++i) {
-        workers_.emplace_back(&ThreadPool::worker_loop, this);
+        workers_.emplace_back(new Worker());
+        workers_.back()->thread = std::thread(&ThreadPool::worker_loop, this, i);
     }
 }
 
@@ -16,102 +21,134 @@ ThreadPool::~ThreadPool() {
     }
 }
 
+void ThreadPool::worker_loop(size_t worker_id) {
+    Worker* self = workers_[worker_id].get();
+    if (!self) {
+        std::cerr << "Error: Worker " << worker_id << " is null\n";
+        return;
+    }
 
-void ThreadPool::wait() {
-    while (true) {
-        // Full memory barrier to ensure we see all updates
-        std::atomic_thread_fence(std::memory_order_seq_cst);
-        
-        // Check both queue and active tasks with strong ordering
-        bool queue_empty = task_queue_.empty();
-        int active = active_tasks_.load(std::memory_order_seq_cst);
-        
-        if (queue_empty && active == 0) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    while (running_.load(std::memory_order_acquire)) {
+        if (!self) {
+            std::cerr << "Error: Worker " << worker_id << " became null\n";
             break;
         }
+        Task task;
         
-        // Brief sleep to prevent busy waiting
-        std::this_thread::sleep_for(std::chrono::microseconds(10));
+        // 1. Try to get task from local queue
+        if (self->local_queue.pop(task)) {
+            self->idle.store(false, std::memory_order_relaxed);
+            if (!task) continue;
+            try {
+                task();
+            } catch (...) {
+                // Swallow any exceptions during shutdown
+            }
+            active_tasks_.fetch_sub(1, std::memory_order_release);
+            completed_tasks_.fetch_add(1, std::memory_order_release);
+            continue;
+        }
+
+        // 2. Try to steal task from other workers
+        if (steal_task(task, worker_id)) {
+            self->idle.store(false, std::memory_order_relaxed);
+            task();
+            active_tasks_.fetch_sub(1, std::memory_order_release);
+            continue;
+        }
+
+        // 3. No tasks available, go idle
+        self->idle.store(true, std::memory_order_relaxed);
+        idle_workers_.fetch_add(1, std::memory_order_relaxed);
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+        idle_workers_.fetch_sub(1, std::memory_order_relaxed);
+    }
+}
+
+bool ThreadPool::steal_task(Task& task, size_t thief_id) {
+    size_t victim = select_victim(thief_id);
+    if (victim == thief_id) return false;
+    
+    return workers_[victim]->local_queue.pop(task);
+}
+
+size_t ThreadPool::select_victim(size_t thief_id) {
+    static thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<size_t> dist(0, workers_.size() - 1);
+    
+    size_t victim = dist(gen);
+    while (victim == thief_id && workers_.size() > 1) {
+        victim = dist(gen);
+    }
+    return victim;
+}
+
+void ThreadPool::wait() {
+    // Check both active tasks and worker queues
+    while (true) {
+        bool all_idle = true;
+        int active = active_tasks_.load(std::memory_order_acquire);
+        
+        // Check if all workers are idle and queues are empty
+        for (auto& worker : workers_) {
+            if (!worker->idle.load(std::memory_order_relaxed) || 
+                !worker->local_queue.empty()) {
+                all_idle = false;
+                break;
+            }
+        }
+        
+        if (active == 0 && all_idle) {
+            return;
+        }
+        
+        // Also check global queue if using one
+        if (active == 0 && global_queue_.empty()) {
+            return;
+        }
+        
+        std::this_thread::yield();
     }
 }
 
 void ThreadPool::shutdown() {
-    bool expected = true;
-    if (!running_.compare_exchange_strong(expected, false)) {
-        return; // Already shutdown
+    if (!running_.exchange(false, std::memory_order_release)) {
+        return;
     }
 
-    // First wait for active tasks to complete
-    wait();
-
-    // Wake up all threads with poison pills
-    for (size_t i = 0; i < workers_.size(); ++i) {
-        try {
-            task_queue_.push(nullptr); // Poison pill
-        } catch (...) {
-            // Ignore queue errors during shutdown
-        }
-    }
-
-    // Join all threads with timeout
-    for (auto& worker : workers_) {
-        if (worker.joinable()) {
-            try {
-                worker.join();
-            } catch (...) {
-                worker.detach(); // Force detach if join fails
-            }
-        }
-    }
-
-    // Final cleanup of any remaining tasks
+    // 1. First drain all queues to prevent new tasks
     Task task;
-    while (task_queue_.pop(task)) {
-        if (task) {
-            try {
+    for (auto& worker : workers_) {
+        while (worker->local_queue.pop(task)) {
+            if (task) {
                 task();
-            } catch (...) {}
+                active_tasks_.fetch_sub(1, std::memory_order_release);
+            }
         }
     }
-}
 
-void ThreadPool::worker_loop() {
-    while (true) {
-        Task task;
-        
-        // Try to get a task with timeout
-        if (task_queue_.pop(task)) {
-            if (!task) { // Poison pill received
-                break;
-            }
-            
-            try {
-                task();
-            } catch (...) {
-                // Swallow exceptions to prevent thread termination
-            }
-        } 
-        else if (!running_.load(std::memory_order_acquire)) {
-            // Exit if queue is empty and shutdown was requested
+    // 2. Wait for active tasks to complete with timeout
+    auto start = std::chrono::steady_clock::now();
+    while (active_tasks_.load(std::memory_order_acquire) > 0) {
+        if (std::chrono::steady_clock::now() - start > std::chrono::seconds(1)) {
+            std::cerr << "Warning: Timeout waiting for tasks to complete\n";
             break;
         }
-        else {
-            // Reduce contention when queue is empty
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
-        }
+        std::this_thread::yield();
     }
 
-    // Drain remaining tasks after shutdown
-    if (running_.load(std::memory_order_acquire)) {
-        Task task;
-        while (task_queue_.pop(task)) {
-            if (task) { // Skip poison pills
-                try {
-                    task();
-                } catch (...) {
-                    // Swallow exceptions
-                }
-            }
+    // 3. Send termination signals
+    for (auto& worker : workers_) {
+        worker->local_queue.push(nullptr);
+    }
+
+    // 4. Join all threads
+    for (auto& worker : workers_) {
+        if (worker->thread.joinable()) {
+            worker->thread.join();
         }
     }
 }

@@ -1,66 +1,93 @@
-# Lock-Free Queue and Thread Pool Project Plan
+# 无锁队列与线程池项目计划
 
-## Project Overview
-Implement a C++11 library featuring:
-1. A lock-free queue using atomic operations
-2. A thread pool built on the lock-free queue
-3. Comprehensive tests and benchmarks
-4. Complete documentation
+## 1. 项目概述
+实现基于C++11的无锁队列和线程池库，遵循Linux内核代码风格，提供高性能并发解决方案。
 
-## Technical Approach
-- **Lock-free queue**: Implement using compare-and-swap (CAS) operations
-- **Thread pool**: Work-stealing design with queue-based task distribution
-- **Testing**: Google Test framework with concurrency tests
-- **Benchmarking**: Google Benchmark for performance metrics
-- **Documentation**: Doxygen with kernel-doc style comments
-- **Code style**: Linux kernel coding style (80 char lines, kernel-doc)
+## 2. 技术栈
+- 语言: C++11
+- 构建系统: CMake
+- 测试框架: Catch2 (已集成在CMake中)
+- 基准测试: Google Benchmark
+- 文档: Doxygen + Markdown
 
-## Implementation Phases
+## 3. 开发阶段
 
-### Phase 1: Lock-Free Queue (2 weeks)
-- Design atomic operations interface
-- Implement core queue functionality
-- Basic unit tests
-- Initial documentation
+### 阶段1: 无锁队列实现 (预计2周)
+- [x] 基础数据结构设计 (已完成头文件框架)
+- [ ] 核心算法实现：
+  - 无锁入队/出队操作
+  - 内存模型选择 (relaxed/acquire/release)
+  - ABA问题防护
+- [ ] 单元测试覆盖：
+  - 单线程基本功能
+  - 多线程并发正确性
+  - 边界条件测试
 
-### Phase 2: Thread Pool (1 week)
-- Design worker thread management
-- Implement task scheduling
-- Integration with queue
-- Basic functionality tests
+### 阶段2: 线程池实现 (预计1.5周)
+- [ ] 基于无锁队列的任务调度
+- [ ] 工作线程管理：
+  - 动态线程增减
+  - 负载均衡
+  - 优雅关闭
+- [ ] 任务接口设计：
+  - 普通函数
+  - Lambda表达式
+  - Future/Promise模式
 
-### Phase 3: Testing (1 week parallel)
-- Comprehensive unit tests
-- Concurrency stress tests
-- Valgrind memory checks
-- Test coverage analysis
+### 阶段3: 性能优化 (预计1周)
+- [ ] 基准测试：
+  - 队列吞吐量测试
+  - 线程池任务处理能力
+  - 不同负载下的性能曲线
+- [ ] 优化方向：
+  - 缓存友好设计
+  - 伪共享避免
+  - 内存分配优化
 
-### Phase 4: Benchmarking (1 week)
-- Throughput measurements
-- Latency profiling
-- Comparison with alternatives
-- Performance optimization
+### 阶段4: 文档与发布 (预计0.5周)
+- [ ] API参考文档
+- [ ] 使用示例
+- [ ] 性能报告
+- [ ] 发布准备：
+  - 版本号
+  - 打包脚本
+  - 兼容性测试
 
-## Documentation
-- API reference (Doxygen)
-- Usage examples
-- Design rationale
-- Performance characteristics
+## 4. 关键技术点
+1. 无锁队列：
+- 使用原子操作实现无锁
+- 基于链表或环形缓冲区
+- 内存回收策略 (Hazard Pointer/RCU)
 
-## Code Style
-- Follow Linux kernel style guidelines
-- 80 character line limits
-- Kernel-doc comment format
-- Clang-format enforcement
+2. 线程池：
+- 任务窃取机制
+- 工作线程状态管理
+- 异常处理策略
 
-## Milestones
-1. Lock-free queue complete - Week 2
-2. Thread pool functional - Week 3
-3. Tests passing - Week 4
-4. Benchmarks complete - Week 5
-5. Documentation finalized - Week 6
+## 5. 测试策略
+- 单元测试覆盖率 ≥90%
+- 并发测试场景：
+  - 生产者-消费者模式
+  - 多生产者多消费者
+  - 长时间稳定性测试
+- 性能基准：
+  - 与标准库队列对比
+  - 不同线程数下的扩展性
 
-## Risk Management
-- Concurrency bugs: Addressed through extensive testing
-- Performance issues: Identified and optimized via benchmarks
-- Memory model complexity: Documented thoroughly
+## 6. 代码质量
+- 遵循Linux内核代码风格
+- 静态分析工具集成
+- 持续集成流程
+
+## 7. 风险与应对
+1. 无锁算法复杂性：
+   - 对策：分步验证，使用现成算法参考
+
+2. 性能瓶颈：
+   - 对策：多方案对比，性能剖析
+
+3. 内存安全问题：
+   - 对策：严格测试，使用内存分析工具
+
+## 8. 时间估算
+总工期：5周 (含缓冲时间)

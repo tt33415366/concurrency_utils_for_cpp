@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(concurrency_in_cpp LANGUAGES CXX)
 
+# Use C++11 standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -11,13 +12,29 @@ endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 
-# Benchmark setup - temporarily disabled due to network issues
-option(ENABLE_BENCHMARKS "Build benchmark tests" OFF)
+# Benchmark setup
+option(ENABLE_BENCHMARKS "Build benchmark tests" ON)
+
+if(ENABLE_BENCHMARKS)
+    # Disable benchmark's own tests
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/benchmark)
+    
+    # Queue benchmarks
+    add_executable(queue_bench benchmarks/queue_bench.cpp)
+    target_link_libraries(queue_bench PRIVATE lockfree_queue benchmark pthread)
+
+    # Thread pool benchmarks 
+    add_executable(thread_pool_bench benchmarks/thread_pool_bench.cpp)
+    target_link_libraries(thread_pool_bench PRIVATE lockfree_queue benchmark pthread)
+endif()
 
 # Google Test setup
 if(NOT TARGET gtest)
     message(STATUS "Using local Google Test from third_party")
     add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/googletest)
+    include(GoogleTest)
 endif()
 
 # Set up include directories
@@ -26,6 +43,9 @@ include_directories(
     SYSTEM ${CMAKE_SOURCE_DIR}/third_party/googletest/googlemock/include
     ${CMAKE_SOURCE_DIR}/include
 )
+
+# Enable testing
+enable_testing()
 
 # Header-only library target
 add_library(lockfree_queue INTERFACE)

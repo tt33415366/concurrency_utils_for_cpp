@@ -3,8 +3,6 @@
 
 #include <atomic>
 #include <memory>
-#include <vector>
-#include <mutex>
 
 namespace lockfree {
 
@@ -31,21 +29,9 @@ private:
         Node(T value) : data(std::move(value)), next(nullptr) {}
     };
 
-    // Hazard pointer record
-    struct HazardPointer {
-        std::atomic<Node*> ptr;
-        HazardPointer* next;
-    };
-
-    static thread_local HazardPointer hp_;
-
     std::atomic<Node*> head_;
     std::atomic<Node*> tail_;
     std::atomic<size_t> size_;
-    std::atomic<Node*> retired_list_{nullptr};
-    
-    void retire_node(Node* node);
-    void scan(HazardPointer* hp_head);
 };
 
 } // namespace lockfree

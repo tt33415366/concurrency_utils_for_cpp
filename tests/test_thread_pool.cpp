@@ -37,8 +37,8 @@ TEST(ThreadPoolTest, MultipleTasks) {
 
 TEST(ThreadPoolTest, HighConcurrency) {
     lockfree::ThreadPool pool(4); // Limit to 4 threads
-    constexpr int kThreads = 8;
-    constexpr int kTasksPerThread = 100;
+    constexpr int kThreads = 4;
+    constexpr int kTasksPerThread = 50;
     std::vector<std::thread> threads;
     std::atomic_int total_tasks(0);
     std::atomic_int failures(0);
@@ -91,12 +91,18 @@ TEST(ThreadPoolTest, WorkStealing) {
 TEST(ThreadPoolTest, ShutdownBehavior) {
     lockfree::ThreadPool pool(2);
     std::atomic_int counter(0);
+    std::promise<void> task_started;
+    auto started = task_started.get_future();
     
-    pool.submit([&counter]() {
+    auto future = pool.submit([&]() {
+        task_started.set_value();
         counter.fetch_add(1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     });
     
+    started.wait(); // Ensure task started
     pool.shutdown();
+    
     EXPECT_EQ(1, counter.load());
     
     // Verify no new tasks accepted

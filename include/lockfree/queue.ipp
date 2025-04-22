@@ -1,143 +1,49 @@
 #ifndef LOCKFREE_QUEUE_IPP
 #define LOCKFREE_QUEUE_IPP
 
+#include <iostream>
+
 namespace lockfree {
 
 template <typename T>
-thread_local typename Queue<T>::HazardPointer Queue<T>::hp_;
+Queue<T>::Queue() : 
+    head_(new Node(T{})), 
+    tail_(head_.load()),
+    size_(0) {}
 
 template <typename T>
-Queue<T>::Queue() : 
-    head_(new Node(T())),
-    tail_(head_.load()),
-    size_(0) {
-    hp_.ptr.store(nullptr, std::memory_order_relaxed);
+Queue<T>::~Queue() {
+    while (Node* node = head_.load()) {
+        head_.store(node->next);
+        delete node;
+    }
 }
 
 template <typename T>
 void Queue<T>::push(T value) {
     Node* new_node = new Node(std::move(value));
     Node* old_tail = tail_.exchange(new_node, std::memory_order_acq_rel);
-    std::atomic_thread_fence(std::memory_order_release);
     old_tail->next.store(new_node, std::memory_order_release);
     size_.fetch_add(1, std::memory_order_relaxed);
 }
 
 template <typename T>
 bool Queue<T>::pop(T& value) {
-    Node* old_head = nullptr;
-    Node* next_node = nullptr;
-    
-    while (true) {
-        old_head = head_.load(std::memory_order_acquire);
-        if (!old_head) {
-            hp_.ptr.store(nullptr, std::memory_order_release);
-            return false;
-        }
-        
-        hp_.ptr.store(old_head, std::memory_order_release);
-        if (head_.load(std::memory_order_acquire) != old_head) {
-            continue;
-        }
-        
+    Node* old_head = head_.load(std::memory_order_relaxed);
+    Node* next_node;
+
+    do {
         next_node = old_head->next.load(std::memory_order_acquire);
-        if (!next_node) {
-            hp_.ptr.store(nullptr, std::memory_order_release);
-            return false;
-        }
-        
-        if (head_.compare_exchange_strong(
-            old_head,
-            next_node,
-            std::memory_order_release,
-            std::memory_order_relaxed)) {
-            break;
-        }
-    }
+        if (!next_node) return false;
+    } while (!head_.compare_exchange_weak(
+        old_head, next_node, 
+        std::memory_order_acq_rel, 
+        std::memory_order_relaxed));
 
     value = std::move(next_node->data);
+    delete old_head;
     size_.fetch_sub(1, std::memory_order_relaxed);
-    
-    // Safe to retire old head now
-    retire_node(old_head);
-    hp_.ptr.store(nullptr, std::memory_order_release);
     return true;
-}
-
-template <typename T>
-void Queue<T>::retire_node(Node* node) {
-    // Add to lock-free retired list
-    Node* expected = retired_list_.load(std::memory_order_relaxed);
-    node->next.store(expected, std::memory_order_relaxed);
-    while (!retired_list_.compare_exchange_weak(
-        expected, node, std::memory_order_release, std::memory_order_relaxed)) {
-        node->next.store(expected, std::memory_order_relaxed);
-    }
-    
-    // Scan periodically
-    static thread_local int count = 0;
-    if (++count % 100 == 0) {
-        scan(&hp_);
-    }
-}
-
-template <typename T>
-void Queue<T>::scan(HazardPointer* hp_head) {
-    // Collect all hazard pointers
-    std::vector<Node*> hazards;
-    for (HazardPointer* hp = hp_head; hp; hp = hp->next) {
-        if (Node* ptr = hp->ptr.load(std::memory_order_acquire)) {
-            hazards.push_back(ptr);
-        }
-    }
-    
-    // Process retired nodes
-    Node* retired = retired_list_.exchange(nullptr, std::memory_order_acquire);
-    std::vector<Node*> survivors;
-    
-    while (retired) {
-        Node* next = retired->next.load(std::memory_order_relaxed);
-        bool hazardous = false;
-        
-        for (Node* hazard : hazards) {
-            if (retired == hazard) {
-                hazardous = true;
-                break;
-            }
-        }
-        
-        if (hazardous) {
-            survivors.push_back(retired);
-        } else {
-            delete retired;
-        }
-        
-        retired = next;
-    }
-    
-    // Re-add surviving nodes
-    for (Node* node : survivors) {
-        retire_node(node);
-    }
-}
-
-template <typename T>
-Queue<T>::~Queue() {
-    // Delete all nodes from retired list
-    Node* retired = retired_list_.exchange(nullptr);
-    while (retired) {
-        Node* next = retired->next.load(std::memory_order_relaxed);
-        delete retired;
-        retired = next;
-    }
-    
-    // Delete remaining nodes in queue
-    Node* current = head_.load();
-    while (current) {
-        Node* next = current->next.load(std::memory_order_relaxed);
-        delete current;
-        current = next;
-    }
 }
 
 template <typename T>
@@ -152,4 +58,4 @@ size_t Queue<T>::size() const {
 
 } // namespace lockfree
 
-#endif // LOCKFREE_QUEUE_IPP
+#endif /* LOCKFREE_QUEUE_IPP */
