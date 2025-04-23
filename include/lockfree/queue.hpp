@@ -20,13 +20,23 @@ public:
     bool pop(T& value);
     bool empty() const;
     size_t size() const;
+    
+    void clear();
+    static size_t get_active_nodes();
+    static void force_release_nodes();
 
 private:
     struct Node {
         T data;
         std::atomic<Node*> next;
+        static std::atomic<size_t> active_nodes;
 
-        Node(T value) : data(std::move(value)), next(nullptr) {}
+        Node(T value) : data(std::move(value)), next(nullptr) {
+            active_nodes.fetch_add(1, std::memory_order_relaxed);
+        }
+        ~Node() {
+            active_nodes.fetch_sub(1, std::memory_order_relaxed);
+        }
     };
 
     std::atomic<Node*> head_;

@@ -95,12 +95,12 @@ TEST(ThreadPoolTest, ShutdownBehavior) {
     auto started = task_started.get_future();
     
     auto future = pool.submit([&]() {
-        task_started.set_value();
         counter.fetch_add(1);
+        task_started.set_value(); // Set promise after task starts
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     });
     
-    started.wait(); // Ensure task started
+    started.wait(); // Wait for task to start
     pool.shutdown();
     
     EXPECT_EQ(1, counter.load());

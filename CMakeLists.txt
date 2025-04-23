@@ -53,6 +53,8 @@ add_library(lockfree_queue INTERFACE)
 target_sources(lockfree_queue INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/lockfree/queue.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/lockfree/queue.ipp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/lockfree/thread_pool.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/lockfree/thread_pool.ipp
 )
 
 target_include_directories(lockfree_queue INTERFACE
@@ -74,6 +76,10 @@ add_executable(test_thread_pool
     tests/test_thread_pool.cpp
 )
 
+add_executable(test_aba_protected_queue
+    tests/test_aba_protected_queue.cpp
+)
+
 # Link test executables
 target_link_libraries(test_queue
     PRIVATE
@@ -84,6 +90,14 @@ target_link_libraries(test_queue
 )
 
 target_link_libraries(test_thread_pool
+    PRIVATE
+    lockfree_queue
+    gtest
+    gtest_main
+    pthread
+)
+
+target_link_libraries(test_aba_protected_queue
     PRIVATE
     lockfree_queue
     gtest
@@ -109,4 +123,5 @@ target_link_libraries(minimal_test
 enable_testing()
 add_test(NAME test_queue COMMAND test_queue)
 add_test(NAME test_thread_pool COMMAND test_thread_pool)
+add_test(NAME test_aba_protected_queue COMMAND test_aba_protected_queue)
 add_test(NAME minimal_test COMMAND minimal_test)
